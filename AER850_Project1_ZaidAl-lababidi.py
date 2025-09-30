@@ -17,7 +17,7 @@ import joblib as jl
 """
 Step 1: Import Library
 """
-data = pd.read_csv("C:\Github\AER850_Codes\Project 1 Data.csv")
+data = pd.read_csv("C:\Github\AER850_Project1\Project 1 Data.csv")
 
 print(data.head())
 
@@ -29,15 +29,24 @@ ax.plot(data["X"], data["Y"], data["Z"])
 mplot.title("Statistical Representation of Data in 3d Space")
 
 fig, ay = mplot.subplots()
-ay.plot(data["Step"], data["X"])
-ay.plot(data["Step"], data["Y"])
-ay.plot(data["Step"], data["Z"])
+ay.plot(data["Step"], data["X"], label='X')
+ay.plot(data["Step"], data["Y"], label='Y')
+ay.plot(data["Step"], data["Z"], label='Z')
+mplot.legend()
 
 fig, az = mplot.subplots()
-az.plot(data["X"])
-az.plot(data["Y"])
-az.plot(data["Z"])
-az.plot(data["Step"])
+az.plot(data["X"], label='X')
+az.plot(data["Y"], label='Y')
+az.plot(data["Z"], label='Z')
+az.plot(data["Step"], label='Step')
+mplot.legend()
+
+fig, aw = mplot.subplots()
+aw.scatter(data["Step"], data["X"], label='X')
+aw.scatter(data["Step"], data["Y"], label='Y')
+aw.scatter(data["Step"], data["Z"], label='Z')
+mplot.legend()
+
 """
 Step 3: Correlation Analysis
 """
@@ -65,3 +74,19 @@ for i in range(1, 860):
 r_xy = sum(xy_arr)/np.sqrt(sum(x_arr)*sum(y_arr))
 r_xz = sum(xz_arr)/np.sqrt(sum(x_arr)*sum(z_arr))
 r_yz = sum(yz_arr)/np.sqrt(sum(y_arr)*sum(z_arr))
+
+"""
+Step 4: Classification Model Development/Engineering
+"""
+
+"""
+Step 5: Model Performance Analysis
+"""
+
+"""
+Step 6: Stacked Model Performance Analysis
+"""
+
+"""
+Step 7: Model Evaluations
+"""
