@@ -19,8 +19,6 @@ Step 1: Import Library
 """
 data = pd.read_csv("C:\Github\AER850_Project1\Project 1 Data.csv")
 
-print(data.head())
-
 """
 Step 2: Perform Statistical Analysis
 """
@@ -28,24 +26,16 @@ fig, ax = mplot.subplots(subplot_kw={"projection":"3d"})
 ax.plot(data["X"], data["Y"], data["Z"])
 mplot.title("Statistical Representation of Data in 3d Space")
 
-fig, ay = mplot.subplots()
-ay.plot(data["Step"], data["X"], label='X')
-ay.plot(data["Step"], data["Y"], label='Y')
-ay.plot(data["Step"], data["Z"], label='Z')
-mplot.legend()
+grouped_data = data.groupby('Step')
 
-fig, az = mplot.subplots()
-az.plot(data["X"], label='X')
-az.plot(data["Y"], label='Y')
-az.plot(data["Z"], label='Z')
-az.plot(data["Step"], label='Step')
-mplot.legend()
+fig, step_split = mplot.subplots(subplot_kw={"projection":"3d"})
+mplot.title("Statistical Representation of Steps Split by Count in 3d Space")
 
-fig, aw = mplot.subplots()
-aw.scatter(data["Step"], data["X"], label='X')
-aw.scatter(data["Step"], data["Y"], label='Y')
-aw.scatter(data["Step"], data["Z"], label='Z')
-mplot.legend()
+for i in list(range(1,14)):
+    step_split.plot(grouped_data.get_group(i)["X"], grouped_data.get_group(i)["Y"], grouped_data.get_group(i)["Z"])
+
+#Uncomment following line for legend (couldn't take the overlap off)
+#step_split.legend(['Step 1', 'Step 2', 'Step 3', 'Step 4', 'Step 5', 'Step 6', 'Step 7', 'Step 8', 'Step 9', 'Step 10', 'Step 11', 'Step 12', 'Step 13'], loc='best')
 
 """
 Step 3: Correlation Analysis
@@ -78,6 +68,71 @@ r_yz = sum(yz_arr)/np.sqrt(sum(y_arr)*sum(z_arr))
 """
 Step 4: Classification Model Development/Engineering
 """
+from sklearn.model_selection import train_test_split, StratifiedShuffleSplit
+
+data["Steps Split"] = pd.cut(data["Step"], bins = (list(range(0, 14))), labels = list(range(1,14)))
+splitter_tool = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+
+for train_index, test_index in splitter_tool.split(data, data["Steps Split"]):
+    strat_data_train = data.loc[train_index].reset_index(drop=True)
+    strat_data_test = data.loc[test_index].reset_index(drop=True)
+strat_data_train = strat_data_train.drop(columns=["Steps Split"], axis=1)
+strat_data_test = strat_data_test.drop(columns=["Steps Split"], axis = 1)
+
+#Creates a test and train list for the coordinates for each steps
+step_train = strat_data_train["Step"]
+coord_train = strat_data_train.drop(columns=["Step"])
+step_test = strat_data_test["Step"]
+coord_test = strat_data_test.drop(columns=["Step"]) 
+
+corr_matrix = strat_data_train.corr()
+f, bx = mplot.subplots(figsize=(11, 9))
+cmap = sb.diverging_palette(230, 20, as_cmap=True)
+sb.heatmap(corr_matrix, cmap=cmap)
+
+
+#Data Scaling
+from sklearn.preprocessing import StandardScaler
+sc = StandardScaler()
+sc.fit(coord_train)
+
+#pd.DataFrame(coord_train).to_csv("UnscaledOriginalData.csv")
+coord_train = sc.transform(coord_train)
+#pd.DataFrame(coord_train).to_csv("ScaledOriginalData.csv")
+
+coord_test = sc.transform(coord_test)
+
+#Developing the first model, Linear Regression which will be used to as a baseline to evaluate the other models.
+from sklearn.linear_model import LinearRegression
+mdl1 = LinearRegression()
+mdl1.fit(coord_train, step_train)
+mdl1.fit(coord_test, step_test)
+
+step_pred_train1 = mdl1.predict(coord_train)
+for i in range(5):
+    print("Predictions: ", step_pred_train1[i], "Actual Values: ", step_train[i])
+
+print("Training accuracy:", mdl1.score(coord_train, step_train))
+print("Test accuracy:", mdl1.score(coord_test, step_test))
+
+#Developing the second model SVC (Support Vector Classifier)
+from sklearn.svm import SVC
+from sklearn.pipeline import Pipeline
+mdl2 = Pipeline([("Scaler", sc), ("clf", SVC(kernel="linear", probability=True, random_state=42))])
+mdl2.fit(coord_train, step_train)
+step_pred_train2=mdl2.predict(coord_train)
+for i in range(5):
+    print("Predictions: ", step_pred_train2[i], "Actual Values: ", step_train[i])
+print("SVC Training Accuracy", mdl2.score(coord_train, step_train))
+print("SVC Testing Accuracy", mdl2.score(coord_test, step_test))
+
+#Last model used will be decision tree. This model will be used as it has a certain ability to tune its depth.
+from sklearn.tree import DecisionTreeClassifier
+mdl3 = DecisionTreeClassifier(max_depth=10, random_state=42)
+mdl3.fit(coord_train, step_train)
+print("Decision Tree Training Accuracy: ", mdl2.score(coord_train, step_train))
+print("Decision Tree Test Accuracy: ", mdl2.score(coord_test, step_test))
+
 
 """
 Step 5: Model Performance Analysis
