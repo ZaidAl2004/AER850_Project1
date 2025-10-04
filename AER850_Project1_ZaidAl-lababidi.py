@@ -68,7 +68,7 @@ r_yz = sum(yz_arr)/np.sqrt(sum(y_arr)*sum(z_arr))
 """
 Step 4: Classification Model Development/Engineering
 """
-from sklearn.model_selection import train_test_split, StratifiedShuffleSplit
+from sklearn.model_selection import StratifiedShuffleSplit
 
 data["Steps Split"] = pd.cut(data["Step"], bins = (list(range(0, 14))), labels = list(range(1,14)))
 splitter_tool = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
@@ -102,9 +102,10 @@ coord_train = sc.transform(coord_train)
 
 coord_test = sc.transform(coord_test)
 
-#Developing the first model, Linear Regression which will be used to as a baseline to evaluate the other models.
-from sklearn.linear_model import LinearRegression
-mdl1 = LinearRegression()
+#Developing the first model, Logistic Regression which will be used to as a baseline to evaluate the other models.
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+mdl1 = Pipeline([("scaler", StandardScaler()),("clf", LogisticRegression())])
 mdl1.fit(coord_train, step_train)
 mdl1.fit(coord_test, step_test)
 
@@ -112,35 +113,87 @@ step_pred_train1 = mdl1.predict(coord_train)
 for i in range(5):
     print("Predictions: ", step_pred_train1[i], "Actual Values: ", step_train[i])
 
-print("Training accuracy:", mdl1.score(coord_train, step_train))
-print("Test accuracy:", mdl1.score(coord_test, step_test))
 
 #Developing the second model SVC (Support Vector Classifier)
 from sklearn.svm import SVC
-from sklearn.pipeline import Pipeline
 mdl2 = Pipeline([("Scaler", sc), ("clf", SVC(kernel="linear", probability=True, random_state=42))])
 mdl2.fit(coord_train, step_train)
 step_pred_train2=mdl2.predict(coord_train)
 for i in range(5):
     print("Predictions: ", step_pred_train2[i], "Actual Values: ", step_train[i])
-print("SVC Training Accuracy", mdl2.score(coord_train, step_train))
-print("SVC Testing Accuracy", mdl2.score(coord_test, step_test))
 
-#Last model used will be decision tree. This model will be used as it has a certain ability to tune its depth.
+#Last model used will be decision tree.
 from sklearn.tree import DecisionTreeClassifier
 mdl3 = DecisionTreeClassifier(max_depth=10, random_state=42)
 mdl3.fit(coord_train, step_train)
-print("Decision Tree Training Accuracy: ", mdl2.score(coord_train, step_train))
-print("Decision Tree Test Accuracy: ", mdl2.score(coord_test, step_test))
 
 
 """
 Step 5: Model Performance Analysis
 """
 
+#Model Performance Analysis for model 1 (Logistic Regression)
+from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score
+print("Training accuracy:", mdl1.score(coord_train, step_train))
+print("Test accuracy:", mdl1.score(coord_test, step_test))
+
+#Confusion Matrix
+step_pred_mdl1 = mdl1.predict(coord_test)
+cm_mdl1 = confusion_matrix(step_test, step_pred_mdl1)
+print("Confusion Matrix:")
+print(cm_mdl1)
+
+#Showing precision, recall and f1 scores
+precision_score_mdl1 = precision_score(step_test, step_pred_mdl1, average="micro")
+recall_score_mdl1 = recall_score(step_test, step_pred_mdl1, average="micro")
+f1_score_mdl1 = f1_score(step_test, step_pred_mdl1, average="micro")
+print("Precision: ", precision_score_mdl1)
+print("Recall: ", recall_score_mdl1)
+print("F1: Score: ", f1_score_mdl1)
+
+
+#Model Performance Analysis for model 2 (Support Vector Classifier)
+print("SVC Training Accuracy", mdl2.score(coord_train, step_train))
+print("SVC Testing Accuracy", mdl2.score(coord_test, step_test))
+
+#Confusion Matrix
+step_pred_mdl2 = mdl2.predict(coord_test)
+cm_mdl2 = confusion_matrix(step_test, step_pred_mdl2)
+print("Confusion Matrix:")
+print(cm_mdl2)
+
+#Showing precision, recall and f1 scores
+precision_score_mdl2 = precision_score(step_test, step_pred_mdl1, average="weighted")
+recall_score_mdl2 = recall_score(step_test, step_pred_mdl1, average="micro")
+f1_score_mdl2 = f1_score(step_test, step_pred_mdl1, average="micro")
+print("Precision: ", precision_score_mdl2)
+print("Recall: ", recall_score_mdl2)
+print("F1: Score: ", f1_score_mdl2)
+
+
+#Model Performance Analysis for model 3 (Decision Tree)
+print("Decision Tree Training Accuracy: ", mdl2.score(coord_train, step_train))
+print("Decision Tree Test Accuracy: ", mdl2.score(coord_test, step_test))
+
+#Confusion Matrix
+step_pred_mdl3 = mdl3.predict(coord_test)
+cm_mdl3 = confusion_matrix(step_test, step_pred_mdl3)
+print("Confusion Matrix:")
+print(cm_mdl3)
+
+#Showing precision, recall and f1 scores
+precision_score_mdl3 = precision_score(step_test, step_pred_mdl3, average="micro")
+recall_score_mdl3 = recall_score(step_test, step_pred_mdl3, average="micro")
+f1_score_mdl3 = f1_score(step_test, step_pred_mdl3, average="micro")
+print("Precision: ", precision_score_mdl3)
+print("Recall: ", recall_score_mdl3)
+print("F1: Score: ", f1_score_mdl3)
+
+
 """
 Step 6: Stacked Model Performance Analysis
 """
+
 
 """
 Step 7: Model Evaluations
