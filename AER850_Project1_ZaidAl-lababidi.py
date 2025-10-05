@@ -12,7 +12,6 @@ import pandas as pd
 import matplotlib.pyplot as mplot
 import numpy as np
 import seaborn as sb
-import joblib as jl
 
 """
 Step 1: Import Library
@@ -22,10 +21,6 @@ data = pd.read_csv("C:\Github\AER850_Project1\Project 1 Data.csv")
 """
 Step 2: Perform Statistical Analysis
 """
-fig, ax = mplot.subplots(subplot_kw={"projection":"3d"})
-ax.plot(data["X"], data["Y"], data["Z"])
-mplot.title("Statistical Representation of Data in 3d Space")
-
 grouped_data = data.groupby('Step')
 
 fig, step_split = mplot.subplots(subplot_kw={"projection":"3d"})
@@ -35,38 +30,10 @@ for i in list(range(1,14)):
     step_split.plot(grouped_data.get_group(i)["X"], grouped_data.get_group(i)["Y"], grouped_data.get_group(i)["Z"])
 
 #Uncomment following line for legend (couldn't take the overlap off)
-#step_split.legend(['Step 1', 'Step 2', 'Step 3', 'Step 4', 'Step 5', 'Step 6', 'Step 7', 'Step 8', 'Step 9', 'Step 10', 'Step 11', 'Step 12', 'Step 13'], loc='best')
+step_split.legend(['Step 1', 'Step 2', 'Step 3', 'Step 4', 'Step 5', 'Step 6', 'Step 7', 'Step 8', 'Step 9', 'Step 10', 'Step 11', 'Step 12', 'Step 13'], loc='best')
 
 """
 Step 3: Correlation Analysis
-"""
-
-x_mean = np.mean(data["X"])
-y_mean = np.mean(data["Y"])
-z_mean = np.mean(data["Z"])
-
-xy_arr = []
-xz_arr = []
-yz_arr = []
-x_arr = []
-y_arr = []
-z_arr = []
-
-for i in range(1, 860):
-    xy_arr.append((data["X"][i] - x_mean)*(data["Y"][i] - y_mean))
-    xz_arr.append((data["X"][i] - x_mean)*(data["Z"][i] - z_mean))
-    yz_arr.append((data["Y"][i] - y_mean)*(data["Z"][i] - z_mean))
-    
-    x_arr.append((data["X"][i] - x_mean)**2)
-    y_arr.append((data["Y"][i] - y_mean)**2)
-    z_arr.append((data["Z"][i] - z_mean)**2)
-    
-r_xy = sum(xy_arr)/np.sqrt(sum(x_arr)*sum(y_arr))
-r_xz = sum(xz_arr)/np.sqrt(sum(x_arr)*sum(z_arr))
-r_yz = sum(yz_arr)/np.sqrt(sum(y_arr)*sum(z_arr))
-
-"""
-Step 4: Classification Model Development/Engineering
 """
 from sklearn.model_selection import StratifiedShuffleSplit
 
@@ -91,16 +58,13 @@ cmap = sb.diverging_palette(230, 20, as_cmap=True)
 sb.heatmap(corr_matrix, cmap=cmap)
 
 
+"""
+Step 4: Classification Model Development/Engineering
+"""
 #Data Scaling
 from sklearn.preprocessing import StandardScaler
 sc = StandardScaler()
 sc.fit(coord_train)
-
-#pd.DataFrame(coord_train).to_csv("UnscaledOriginalData.csv")
-coord_train = sc.transform(coord_train)
-#pd.DataFrame(coord_train).to_csv("ScaledOriginalData.csv")
-
-coord_test = sc.transform(coord_test)
 
 #Developing the first model, Logistic Regression which will be used to as a baseline to evaluate the other models.
 from sklearn.linear_model import LogisticRegression
@@ -113,6 +77,14 @@ step_pred_train1 = mdl1.predict(coord_train)
 for i in range(5):
     print("Predictions: ", step_pred_train1[i], "Actual Values: ", step_train[i])
 
+from sklearn.model_selection import GridSearchCV
+param1 = {
+    "clf__C": [1, 10, 100, 1000]
+    }
+gs1=GridSearchCV(mdl1, param_grid=param1, scoring="roc_auc", cv=5, n_jobs=-1)
+gs1.fit(coord_train, step_train)
+#Updating first model to best estimator
+mdl1 = gs1.best_estimator_
 
 #Developing the second model SVC (Support Vector Classifier)
 from sklearn.svm import SVC
@@ -122,10 +94,39 @@ step_pred_train2=mdl2.predict(coord_train)
 for i in range(5):
     print("Predictions: ", step_pred_train2[i], "Actual Values: ", step_train[i])
 
+#Improving SVC model using Grid Search
+param2= {
+    "clf__kernel": ["linear", "rbf"],
+    "clf__C": [1, 10, 100, 1000],
+    "clf__gamma": ["scale"]
+    }
+gs2=GridSearchCV(mdl2, param_grid=param2, scoring="roc_auc", cv=5, n_jobs=-1)
+gs2.fit(coord_train, step_train)
+#updating second model to best estimator
+mdl2 = gs2.best_estimator_
+
 #Last model used will be decision tree.
 from sklearn.tree import DecisionTreeClassifier
 mdl3 = DecisionTreeClassifier(max_depth=10, random_state=42)
 mdl3.fit(coord_train, step_train)
+
+#Improving Decision Tree classifier using Grid Search
+param3= {
+    "max_depth": [None, 6, 10, 16]
+    }
+gs3=GridSearchCV(mdl3, param_grid=param3, scoring="roc_auc", cv=5, n_jobs=-1)
+gs3.fit(coord_train, step_train)
+#updating third model to best estimator
+mdl3 = gs3.best_estimator_
+
+#Logistic Regression using randomized search cv
+from sklearn.model_selection import RandomizedSearchCV
+param4 = {
+    'clf__C': [0.01, 0.1, 1, 10, 100, 1000]
+    }
+mdl1_rscv = RandomizedSearchCV(mdl1, param4, random_state=42)
+search = mdl1_rscv.fit(coord_train, step_train)
+print("The best parameters are:", search.best_params_)
 
 
 """
@@ -134,22 +135,22 @@ Step 5: Model Performance Analysis
 
 #Model Performance Analysis for model 1 (Logistic Regression)
 from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score
-print("Training accuracy:", mdl1.score(coord_train, step_train))
-print("Test accuracy:", mdl1.score(coord_test, step_test))
+print("Logistic Regression Training accuracy:", mdl1.score(coord_train, step_train))
+print("Logistic Regression Test accuracy:", mdl1.score(coord_test, step_test))
 
 #Confusion Matrix
 step_pred_mdl1 = mdl1.predict(coord_test)
 cm_mdl1 = confusion_matrix(step_test, step_pred_mdl1)
-print("Confusion Matrix:")
+print("Confusion Matrix of Logistic Regression Model:")
 print(cm_mdl1)
 
 #Showing precision, recall and f1 scores
 precision_score_mdl1 = precision_score(step_test, step_pred_mdl1, average="micro")
 recall_score_mdl1 = recall_score(step_test, step_pred_mdl1, average="micro")
 f1_score_mdl1 = f1_score(step_test, step_pred_mdl1, average="micro")
-print("Precision: ", precision_score_mdl1)
-print("Recall: ", recall_score_mdl1)
-print("F1: Score: ", f1_score_mdl1)
+print("Precision of Logistic Regression: ", precision_score_mdl1)
+print("Recall of Logistic Regression: ", recall_score_mdl1)
+print("F1 Score of Logistic Regression: ", f1_score_mdl1)
 
 
 #Model Performance Analysis for model 2 (Support Vector Classifier)
@@ -159,16 +160,16 @@ print("SVC Testing Accuracy", mdl2.score(coord_test, step_test))
 #Confusion Matrix
 step_pred_mdl2 = mdl2.predict(coord_test)
 cm_mdl2 = confusion_matrix(step_test, step_pred_mdl2)
-print("Confusion Matrix:")
+print("Confusion Matrix of SVC Model:")
 print(cm_mdl2)
 
 #Showing precision, recall and f1 scores
-precision_score_mdl2 = precision_score(step_test, step_pred_mdl1, average="weighted")
-recall_score_mdl2 = recall_score(step_test, step_pred_mdl1, average="micro")
-f1_score_mdl2 = f1_score(step_test, step_pred_mdl1, average="micro")
-print("Precision: ", precision_score_mdl2)
-print("Recall: ", recall_score_mdl2)
-print("F1: Score: ", f1_score_mdl2)
+precision_score_mdl2 = precision_score(step_test, step_pred_mdl2, average="weighted")
+recall_score_mdl2 = recall_score(step_test, step_pred_mdl2, average="micro")
+f1_score_mdl2 = f1_score(step_test, step_pred_mdl2, average="micro")
+print("Precision of SVC Model: ", precision_score_mdl2)
+print("Recall of SVC Model: ", recall_score_mdl2)
+print("F1 Score of SVC Model: ", f1_score_mdl2)
 
 
 #Model Performance Analysis for model 3 (Decision Tree)
@@ -178,23 +179,57 @@ print("Decision Tree Test Accuracy: ", mdl2.score(coord_test, step_test))
 #Confusion Matrix
 step_pred_mdl3 = mdl3.predict(coord_test)
 cm_mdl3 = confusion_matrix(step_test, step_pred_mdl3)
-print("Confusion Matrix:")
+print("Confusion Matrix of Decision Tree:")
 print(cm_mdl3)
 
 #Showing precision, recall and f1 scores
 precision_score_mdl3 = precision_score(step_test, step_pred_mdl3, average="micro")
 recall_score_mdl3 = recall_score(step_test, step_pred_mdl3, average="micro")
 f1_score_mdl3 = f1_score(step_test, step_pred_mdl3, average="micro")
-print("Precision: ", precision_score_mdl3)
-print("Recall: ", recall_score_mdl3)
-print("F1: Score: ", f1_score_mdl3)
+print("Precision of Decision Tree: ", precision_score_mdl3)
+print("Recall of Decision Tree: ", recall_score_mdl3)
+print("F1 Score of Decision Tree: ", f1_score_mdl3)
 
 
 """
 Step 6: Stacked Model Performance Analysis
 """
 
+from sklearn.ensemble import StackingClassifier
+estimators = [('dt', mdl3), ('svr', mdl2)]
+comb_mdl = StackingClassifier(estimators=estimators, final_estimator=mdl1)
+comb_mdl_fitted_train = comb_mdl.fit(coord_train, step_train)
+comb_mdl_pred = comb_mdl.predict(coord_test)
+
+print("Combined Model Training Accuracy: ", comb_mdl.score(coord_train, step_train))
+print("Combined Model Test Accuracy: ", comb_mdl.score(coord_test, step_test))
+
+cm_comb_mdl = confusion_matrix(step_test, comb_mdl_pred)
+print("Confusion Matrix of Combined Model: ")
+print(cm_comb_mdl)
+
+precision_score_comb_mdl = precision_score(step_test, comb_mdl_pred, average="micro")
+recall_score_comb_mdl = recall_score(step_test, comb_mdl_pred, average="micro")
+f1_score_comb_mdl = f1_score(step_test, comb_mdl_pred, average="micro")
+print("Precision of Combined Model: ", precision_score_comb_mdl)
+print("Recall of Combined Model: ", recall_score_comb_mdl)
+print("F1 Score of Combined Model: ", f1_score_comb_mdl)
+
 
 """
 Step 7: Model Evaluations
 """
+
+import joblib as jl
+jl.dump(comb_mdl, "combined_model.pkl")
+loaded_mdl = jl.load("combined_model.pkl")
+test_array = ([9.375,3.0625,1.51], [6.995,5.125,0.3875], [0,3.0625,1.93], [9.4,3,1.8], [9.4,3,1.3])
+loaded_mdl_pred = loaded_mdl.predict(test_array)
+
+mdl1_test_pred = mdl1.predict(test_array)
+mdl2_test_pred = mdl2.predict(test_array)
+mdl3_test_pred = mdl3.predict(test_array)
+print(loaded_mdl_pred)
+print(mdl1_test_pred)
+print(mdl2_test_pred)
+print(mdl3_test_pred)
